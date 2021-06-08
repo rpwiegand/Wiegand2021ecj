@@ -1,0 +1,407 @@
+\documentclass[twoside]{article}
+\usepackage{ecj,palatino,epsfig,latexsym,natbib}
+\usepackage{graphicx}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{amsmath,amssymb} 
+
+%\smartqed  % flush right qed marks, e.g. at end of proof
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+
+\newcommand{\IR}{\mathbb{R}}
+
+
+%% do not add any other page- or text-size instruction here
+
+\parskip=0.00in
+
+\begin{document}
+
+\ecjHeader{x}{x}{xxx-xxx}{201X}{Analysis of Simple Novelty Search}{R.P. Wiegand}
+\title{\bf Preliminary Analysis of Simple Novelty Search}  
+
+\author{\name{\bf R. Paul Wiegand} \hfill \addr{wiegandrp@winthrop.edu}\\ 
+        \addr{Department of Computer Science \& Quantitative Methods\\
+        Winthrop University, Rock Hill, SC, 29733, United States}
+}
+
+\maketitle
+
+\begin{abstract}
+%TBD 200 words
+Novelty search is a powerful tool for finding sets of complex objects in complicated, open-ended spaces.  Recent empirical analysis on a simplified version of novelty search makes it clear that novelty search happens at the level of the archive space, not the individual point space.  The sparseness measure and archive update criterion create a process that is driven by a clear pair of objectives:  spread out to \emph{cover} the space, while trying to remain as efficiently \emph{packed} as possible driving these simplified variants to converge to an $\epsilon$-net in the sense defined by $k$ Nearest Neighbor theory.  Among the simplifications was omission of a population:  the archive itself served as both the potential candidate set solution, as well as the source of parents in the evolutionary search, which has the potential to fundamentally hamstring the search.\\[-0.5ex]
+
+In this paper, we relax this crucial assumption, generalizing the previous simplified novelty search so that a traditional population and $(\mu, \lambda)$ dynamics are used to produce new search points, and the population and the archive are updated separately.  We show empirically that not only is it still possible to converge, but that it may in fact be \emph{even more} likely to do so.  Archives can grow unbounded, providing an ever increasing surface from which to select points; however, populations are (typically) of fixed size and cannot offer as good a cover of the space, which raises questions about whether there is room to improve these mechanisms to ensure better sources of novel search points.
+\end{abstract}
+
+\begin{keywords}
+novelty search, 
+quality diversity,
+convergence,
+k nearest neighbors.
+\end{keywords}
+
+%====================================================================================
+\section{Introduction}
+\label{sec:introduction}
+
+Though evolutionary computation can be an effective problem solver \cite{ec:DeJong2006,ec:Mitchell97,ec:Michalawicz96,ec:Goldberg89,ec:Holland75}, these biologically-inspired approaches are also applied to tasks other than traditional optimization.  Evolutionary algorithms (EAs) are now used for a variety of creative endeavors from evolving computer programs \cite{ec:LangdonPoli2002,ec:Banzhaf1998,ec:Koza1992} 
+ to discovering faults \cite{HanesWiegand2019tor,Mourad2000srds} to producing art \cite{cs:Dreher2014,Secretan2008chi,ec:Romero2007,bio:Dawkins1996}.  In fact, there is an entire subdiscipline of evolutionary computation dedicated to its ability to generate, create, and innovate \cite{ec:Goldberg2002}.  Unfortunately, there is little foundational analysis for such applications.
+
+\emph{Quality diversity algorithms} \cite{FontainEtAl2020icog} use the innovating mechanisms in evolutionary methods to explore search spaces in order to produce \emph{different kinds} of results (in general), rather than results that optimize an external objective function.  One of the most aggressively advocated methods is so-called, \emph{Novelty Search} \cite{StanleyLehman2015,Lehman2013gecco,LehmanStanley2011cec,LehmanStanley2008ssls}.  The idea behind novelty search is that for certain complex spaces, it may be better to \emph{ignore} the optimization objective and instead \emph{explore} the space by finding objects that are increasingly ``different'' from those that the search process has encountered before.  Though perhaps counter intuitive, novelty search has been surprisingly effective at finding good solutions to a number of challenging problems without even looking for those solutions explicitly.  Examples of novelty search successes include discovering effective grasping behaviors for highly articulated robotic arms \cite{Huang2014cica}, unsupervised feature learning for deep networks \cite{Szerlip2015cai}, discovery of sophisticated gaits for quadruped locomotion \cite{Morse2013acgec}, and goal-seeking in complex multiagent simulations \cite{Lehman2011ecj}.
+
+Advocates of these methods have proposed three critical ideas for \emph{why} novelty search can succeed in such spaces.  The first premise is that novelty search avoids being deceived by local optima since it ignores an external objective in favor of a novelty metric \cite{Lehman2011ecj}.  This is predicated on the claim that novelty search ``\emph{diverges}'' rather than converges.  Second, novelty search tends to be applied when using open-ended or generative representations \cite{LehmanStanley2008ssls} to encourage a process referred to in the literature as ``complexification'' \cite{StanleyMiikkulainen2004jair}.  Complexification is the systematic and steady increase of complex representations via evolutionary search, and this in conjunction with a divergent search will lead to surprising and nuanced discoveries.  Third, using diversity measures within the true solution space (e.g., agent behaviors) rather than the genotype space allows novelty search to discover ''interesting`` areas of that space.  
+
+While sometimes effective, there's little foundational understanding for whether or how these speculations (or others) lead to success.  Are these claims true in general?  If not, when are they true?  In this paper, we begin at the top by looking more closely at the claim that novelty search has no objective, and that it is a ``divergent'' search process \cite{Lehman2016frai,Lehman2015gecco,StanleyLehman2015}.  This paper isolates the claim as to whether novelty search is objectiveless, and we say nothing at all about complexification or discovery in behavioral spaces.  Moreover, our results do not in any way invalidate the success of novelty search, rather we seek to complement existing research by providing more insight into how these searchers work and how to make principled choices regarding some search parameters.
+
+To that end, we propose an alternative view of novelty search where the space being searched is not the solution space (e.g., behaviors) but is rather a space of \emph{archives} of potential solutions.  We borrow from $k$ nearest neighbor theory to provide a formalization of this idea, conduct empirical analyses using measures based on that formalization, and provide a preliminary theoretical framework for understanding such a search process.  Our analysis begins with an extremely simple formulation of novelty search that consists only of the so-called \emph{sparseness} criterion and an archive, and we then relax this by adding a population separate from the archive.  Some of the empirical results of this work appear in \cite{Wiegand2020flairs} and \cite{Wiegand2021flairs}, though this article expands on these empirical results and also adds some theoretical guidance.
+
+We find that novelty search drives the archive toward increasingly better $\epsilon$-covers of the solution space while also trying to optimize the $\epsilon$-packing of the archive.  Simple variants of novelty search that employ the traditional mechanisms can and do converge, even when the space is unbounded.  Moreover, local convergence to suboptimal archives is possible.  Understanding this allows us to give some constructive suggestions for how to apply novelty search more effectively: it is essential to balance the mutation rate and the minimum sparseness criterion appropriately, there may be value in periodic archive resets, and it may be useful to use convex hull estimates of the archive from which to draw future search points.
+
+
+
+%====================================================================================
+\section{Technical Approach}
+\label{sec:approach}
+
+%------------------------------------------------------------------------------------
+\subsection{Sparseness and Archives}
+\label{subsec:sparseness}
+
+The concept of ``novelty'' in traditional novelty search is enforced by a metric designed to measure the \emph{sparseness score} of a point with respect to a group of points.  Specifically, the sparseness of some candidate object $y$, $\rho_y$, is computed as the average distance to the $k$ nearest neighbors in some set $A$:
+%
+\begin{eqnarray}
+  \rho_y := \frac{1}{k} \sum_{i=1}^{k} \delta\left( x^A_i, y\right),
+  \label{eqn:sparseness}
+\end{eqnarray}
+
+\noindent where $x^A_i$ is the $i^{th}$ closest point in set $A$ to $y$ and $\delta$ is some kind of distance calculation.  In other words, $\rho_y$ is the average distance between some point $y$ and the $k$ nearest neighbors to that point in some set $A$.  Though perhaps a misnomer, we keep this term since it is consistent with the literature.  For traditional novelty search, this sparseness score is used in two ways.  
+
+First the sparseness score is used as a type of fitness value for evolution.  Points that have larger scores\,---\,more distant from nearby points in some set\,---\,are more fit.  For selection, this set is typically the population, and it can be used for parent and/or survival selection.  We will also explore the idea of using the archive as the baseline set for selection.
+
+The second way the score is used is as an update mechanism for an archive of points the search is maintaining:  Novelty search adds individuals to the archive only if their sparseness over that archive is above a certain threshold, $\rho_{min}$.  In this way, the archive grows and begins to contain more and more ``novel'' candidate solutions in the sense that they are \emph{different} from one another as defined by the sparseness score.
+
+Though there are many choices for search operators and selection, the rest of the method is essentially an evolutionary algorithm \cite{ec:DeJong2006}.  The idea that the archive continues to expand with novel search points as search proceeds is what that motivates the claim that novelty search diverges.  To be clear, this paper no position as to whether or not divergence in novelty search is an appropriate goal; we merely explore an existing claim to determine whether or not it is generally true that novelty search diverges rather than converges.  It is very clear that the original researchers who composed novelty search intended the search to diverge \cite{Lehman2016frai,Lehman2015gecco,StanleyLehman2015}.
+
+
+%------------------------------------------------------------------------------------
+\subsection{Archive-Based Searches}
+\label{subsec:archive}
+
+In traditional uses of an evolutionary algorithm, individuals in the population represent candidate solutions to a problem.  The search space is the set of candidate solutions to the problem, population members represent potential solutions, and the EA searches that space to find the a good solution.  Given this perspective, it is easy to understand why novelty search \emph{appears} to be objectiveless:  though individuals may be encoding candidate solutions, the algorithms completely ignores the optimization objective associated with that candidate solution with respect to some external problem.  One can imagine search diverging in the sense that increasingly different candidate solutions are progressively proposed in an ever-growing archive, and the direction of that growth is not at all influenced by the problem's objective.  
+
+However, there are alternative ways to understand archive-based searches.  Specifically, some search methods are designed to search a \emph{space of archives}, not individual points.  The multiobjective optimization problem is typically formulated to find an approximation of the Pareto non-dominating \emph{set} for some solution space \cite{SeadaDeb2018moo,Zitzler2012,Zitzler2000ecj}.  Further, \emph{cooptimization} problems, to which coevolutionary algorithms are often applied, are supersets of multiobjective optimization problems.  In cooptimization, the goal is to simultaneously identify the set of underlying objectives and produce a set obeying some solution concept \cite{FiciciPollack2001ecal,BucciPollack2002foga,Popovici2012,Ficici2008mpsn}.  That solution concept may be Pareto-based, but there other concepts (e.g., sets that approximate mixed Nash equilibria).
+
+We take the position that novelty search is, in fact, \emph{not} searching the space of candidate problem solutions being represented by individuals in the population.  Instead, it is searching the space of \emph{novel archives}.  The true goal of this search is to develop an archive that spreads out in some space while also keeping the points in that archive not too close together.  These two notions can be formalized using the concepts of \emph{cover} and \emph{packing} from $k$ nearest neighbor ($k$-NN) theory.  In Section~\pageref{subsec:knn} we will define these terms more formally, and we will also describe some heuristic approximations for measuring these in empirical studies.
+
+In this article, we will consider two variations of novelty search:  \emph{simple novelty search} and \emph{population-based simple novelty search}.  For the latter, we will consider both when population selection uses the population for the baseline sparseness measure, as well as when it uses the archive.   In the former, the population and the archive is the same.  We will also provide some simple formalisms regarding  simple novelty search in bounded Hamming spaces.
+
+%------------------------------------------------------------------------------------
+\subsection{The Simple Novelty Search EA}
+\label{subsec:sns}
+
+We start with a minimalist understanding of novelty search that has only three major components: a genetic operator, an archive, and an update rule.  While the archive is a set of points, this minimalist algorithm cannot be said to have a population \textit{per se}.  Or, perhaps more precisely, the population \emph{is} the archive (and vice-versa).  The purpose of considering this minimalist approach is to understand the fundamental role of the archive's update mechanism.  Informally, the algorithm works as follows.  A parent is selected uniformly at random from within the archive itself, copied then mutated to produce a child.  The child's sparseness is measured against the archive using Equation~\ref{eqn:sparseness}.  If that value is greater than some selected $\rho_{min}$, then the child is added to the archive.  This is repeated until some termination criterion is met.  The pseudocode for this is replicated below; it first appeared in \cite{Wiegand2020flairs}.
+
+\begin{algorithm}[h]
+  \SetAlgoLined
+  \DontPrintSemicolon 
+  \SetKwInOut{Input}{input}
+  \SetKwInOut{Output}{output}
+  
+  \Input{$\rho_{min}, k,$ termination criterion}
+  \Output{$archive$}\;
+    
+  initialize individual $x$\;
+  $archive$ = $\{x\}$\;
+  \While {not reached termination condition} {
+    draw $parent$ uniformly at random from $archive$\;
+    $child$ = mutate(copy of $parent$)\;
+    $\rho = \mbox{sparseness}(child, archive, k)$\;
+    \If {$\rho \geq \rho_{min}$} {
+      $archive = archive \cup \{child\}$\;
+     }
+  }
+  \caption{Simple Novelty Search Evolutionary Algorithm (SNSEA)}
+\end{algorithm}
+
+For this article, we consider $k\in\{3,5,7\}$ for the sparseness computation.  The termination criterion is simply a maximum number of generations (500 in many cases).  We will demonstrate the algorithm in several spaces: a discrete binary space, a bounded real valued space, and an unbounded real valued space.  
+
+In the case of the discrete space experiments, the SNSEA will use a binary representation where individual points exist in the space $\{0,1\}^n$, where $n$ is the length of the binary string.  Mutation is performed by independently flipping each bit with probability $1/n$.  Since there is no external problem-oriented objective, without loss of generality we initialize the first point at $0^n$.  Distance is computed in this space using Hamming distance, thus we refer to it as a \emph{Hamming Space}.  For experiments in this paper, we consider $n\in\{16, 32, 64\}$.
+
+In the case of the Euclidean space experiments, the SNSEA will use a real valued representation where the individual points exist in the space $\IR^d$, where $d$ is the dimension of the space.  Mutation is performed by independently adding an offset to every value in the vector according to $N(0,\sigma)$ (fixed $\sigma$ Gaussian mutation).  Again, without loss of generality we initialize the first point at $0^d$.  Distance is computed in this space using the $L_2$ norm Euclidean distance, thus we refer to it as a \emph{Euclidean Space}.  In the experiment where the space is bounded, we restrict mutation so that it cannot produce child gene values outside of $[0,1]$.  In those experiments, this rule is enforced by redrawing the mutation offset until the mutated gene is inside this region.  For these experiements, we consider $d\in\{2, 3, 5\}$
+
+It is worth noting that conflating the population and the archive is a substantive change to the way novelty search typically works.  Another difference is that all our distance calculations are in the genotype space; however, this is not an important departure since we are only evaluating the claim about whether an objective exists, not what it looks like for a given problem instance.  That is:  If an objective exists in a genotype space and/or if there is a way to characterize \emph{some} novelty searches as ``converging'' then the \emph{general} claims that novelty search \emph{must} diverge and \emph{doesn't} have an objective are false.  Note again that we are not arguing that novelty search \emph{cannot} diverge in some cases, nor that novelty search is ineffective.  We are just trying to understand the nature of archives, updates, and the type of space novelty search EAs traverse.  For this, a genotypic representation is sufficient.
+
+
+%------------------------------------------------------------------------------------
+\subsection{The Population-Based Simple Novelty Search Evolutionary Algorithm}
+\label{subsec:sns}
+One argument for why novelty search \emph{should} and typically \emph{does} separate the archive and the population is the clean separation of roles:  a population contains the current state of the exploration aspects of the search, while the archive contains the potential solution set at that moment of the search.  To explore this role separation, we also implemented a population-based version of the algorithm.  Our population-based simple novelty search EA works as follows.  Each generation, $\lambda$ children are produced from the $\mu$ parents, and the children are added to the archive if they meet the sparseness criterion as computed over the archive.  Additionally, sparseness of the children with respect to the a set is computed, and that the $\mu$ individuals with the highest sparseness values are selected to be in the parent set for the next generation.  This is repeated until some termination criteria is met.  Our experiments examine two different sets to be used for selection purposes:  the child population and the archive.
+%
+\begin{algorithm}[h]
+  \SetAlgoLined
+  \DontPrintSemicolon 
+  \SetKwInOut{Input}{input}
+  \SetKwInOut{Output}{output}
+  
+  \Input{$\rho_{min}, k,$ termination criterion, $\mu$, $\lambda$}
+  \Output{$archive$}\;
+    
+  initialize individual $x = 0^n$\;
+  $archive$ = $\{x\}$\;
+  $P = \{\}$
+  
+  \For {$i \in \{1\ldots\mu\}$} {
+    initialize parent $x \in \IR^n$ uniformly at random, i.i.d\;
+    $P = P \cup \{x\}$\;
+   }
+   
+  \While {not reached termination condition} {
+    $C = \{\}$\;
+    \For {$j \in \{1\ldots\lambda\}$} {
+      $j = j \% \mu$\;
+      draw $x$ from the $j^{th}$ individual in $P$\;
+      $y$ = mutate(copy of $x$)\;
+      $C = C \cup \{y\}$\;
+      $\rho = \mbox{sparseness}(S^\star, y, k)$\;
+      \If {$\rho \geq \rho_{min}$} {
+        $archive = archive \cup \{y\}$\;
+        }
+     }
+    compute sparseness for each individuals in $C$ over $S^\star$\;
+    set $P$ to contain the $\mu$ individuals with the highest sparseness in $C$\; 
+  }
+  \caption{Population-Based Simple Novelty Search Evolutionary Algorithm (PSNSEA).  The algorithm can be configured so that $S^\star$ is either $C$ or $archive$.}
+\end{algorithm}
+%
+This algorithm represents a slight generalization of the one presented in \cite{Wiegand2021flairs}.
+
+Again, we consider $k\in{3,5,7}$ for the sparseness computation.  The termination criterion is simple a maximum number of generations.  We will consider a real-valued representations, where again $d\in\{2,3,5\}$ dimensions.  Gene values are unbounded, and mutation works by independently adding a value drawn from ${\cal N}(0,\sigma)$.  This allows the possibility for the archive to grow in an unbounded way by adding individuals that are ``novel'' in the sense that they are quite distant from individuals seen before.  Again, distance is computed using the $L_2$ norm, Euclidean distance.
+
+For reasons that will become clear when we discuss the results of the SNSEA studies, we do not consider bounded spaces for the PSNSEA.  As before, distance calculations are in the genotype space.
+
+In all cases, experiments were replicated for 50 independent trials and run to 500 generations. All experiments in this paper use $\sigma\in{0.1,0.2}$ and $\rho_{min} \in {0.45, 0.65}$.  We consider both cases where population selection is based on individuals' sparseness with respect to the child population and with respect to the archive.
+
+
+%------------------------------------------------------------------------------------
+\subsection{Packing and Covering}
+\label{subsec:knn}
+
+In order to find formal bounds on how efficiently distance-based, lazy-evaluation methods like $k$ nearest neighbor algorithms are able to develop hypotheses for a given space, the theory community for that field have developed several formal definitions \cite{Clarkson1999dcg}.  These ideas are useful to the present application because novelty search's sparseness metric is explicitly based on $k$ nearest neighbor calculations.  Our formulations below rely on the observation that both the Hamming and Euclidean space distance measures we've discussed imply the spaces we are considering are \emph{metric spaces} \cite{??}.
+
+The first concept we consider is the $\epsilon_c$-cover of a set.  Cover tries to address the question of how well a set spreads out over some space.  A set that \emph{covers} a space well is one that is spread out over that space such that no point in the space is too far from at least one point in the set.
+
+\begin{definition}
+An $\boldsymbol{\epsilon_c}$\textbf{-cover} of some space $Z=\left\langle U, \delta\right\rangle$, where $\delta: U\times U \mapsto \IR$ is a distance measure over $U$, is a set $A \subset U$ such that $\forall x\in U, \exists a\in A$ with $\delta(x,a) \leq \epsilon_c$. 
+%  Given a subset of some larger space $A \subset U$ and distance measure $\delta$ operating over $U$, the $\boldsymbol{\epsilon}$\textbf{-cover} of $A$ is the largest distance between any point in $U$ and it's closest point in $A$.
+\end{definition}
+
+The second concept we consider is $\epsilon_p$-packing of a set:  Packing tries to address the question of how efficiently a set of points represents a space.  A set that \emph{packs} a space well is one in which points inside the set aren't too close together
+
+\begin{definition}
+Given the space $Z=\left\langle U, \delta\right\rangle$, where $\delta: U\times U \mapsto \IR$ is a distance measure over $U$, a set $A\subset U$ is an $\boldsymbol{\epsilon_p}$\textbf{-packing} iff $\delta(a,b) \geq 2\epsilon_p \; \forall a,b \in A$. 
+%  Given a subset of some larger space $A \subset U$ and distance measure $\delta$ operating over $S$, the $\boldsymbol{\epsilon}$\textbf{-packing} of $A$ is the largest distance between any point pair of points in $A$.
+\end{definition}
+
+In the case of cover, smaller is better (points in $U$ are closer to points in $A$).  That is, we are really examining how far our representative points are from other parts of the space\,---\,the smaller that distance, the better our representation.  However, for packing, larger is better (points in $A$ are further apart).  Here we are examining efficiency by seeing how crowded our representatives are\,---\,the further apart the are, the more efficient.  These obviously trade off of one another, and where cover and packing meet, we have a \emph{net}.  
+
+\begin{definition}
+An $\boldsymbol{\epsilon}$\textbf{-net} $A \subset U$ is a set that is an $\epsilon$-cover of $U$ and an $(\epsilon/2)$-packing.
+\end{definition}
+%
+In $k$-NN theory, an $\epsilon$-net is optimal:  A set that is both efficiently packed and covers the space well.
+
+Computing packing is straightforward even in an empirical setting:  half the maximum pairwise distance between every point in the archive.  Packing in novelty search, thus, starts small and grows as points are added to the archive. 
+
+To directly compute the cover is computationally infeasible, so we must approximate it.  We assume that the search will (with high probability) remain within the bound $\pm\sigma\cdot maxGen$ in all dimensions.  This was confirmed experimentally:  in all runs of all experimental groups, none were generated outside that region.  Second, we sample points uniformly at random from inside that bounded hypercube.  Finally, we find the closest point in the archive to each sample point. The maximum of these distances is reported as our estimate for $\epsilon$-cover.  Cover estimates in novelty search will tend to start large, then drop as it becomes increasingly less probable that the algorithm will select new points that fill in the gaps of the space searched so far.
+
+These metrics were presented in \cite{Wiegand2019flairs} and \cite{Wiegand2021flairs}.
+
+
+
+%====================================================================================
+\section{The SNSEA Optimization Process}
+\label{sec:results}
+
+The SNSEA does not separate the population from the archive as most applications novelty search do; however, as stated above another perspective is that the archive \emph{is} the population.  When seen this way, the SNSEA is comparable to a $(\mu+1)$-EA \cite{ec:DeJong2006}, where parent selection occurs randomly from the population (archive) and truncation survival selection is being used.  Of course, it differs from this in that the fitness of an individual depends on the current population (archive), which grows.  This is an important distinction since an individual discovered early in the search process will typically have a different sparseness measure than that same individual discovered later after the archive has developed more.
+
+The algorithm \emph{does} have selective pressure and progresses in a particular direction; it is not random search.  Generally, the algorithm gradually grows the size of the archive, adding new points as they are discovered.  So, as a measure of archive size, the algorithm must increase.
+
+Packing in the population is monotonically non-decreasing since the furthest pair of the points in the archive always remain in the archive.  Moreover, it can (and does) increase since new points added to the archive can create a new distance pair in the archive that is even larger.
+
+The true cover of the archive is monotonically non-increasing.  Again furthest distance from any point in the space to its closest archive point cannot grow any larger since the archive does not lose points.  True cover \emph{can} decrease because the SNSEA can add a new point that is closer to the furthest point in the space.  Our approximation metric estimates cover by sampling, so it will tend to decrease (on average), as well.  
+
+So, the SNSEA will steadily increase packing and archive size, and it will tend to decrease cover.  These are clear and well-defined objectives that are being optimized.  Since the SNSEA is not guaranteed to optimally pack an archive (the points may not necessarily be spaced efficiently), it can overshoot the $\epsilon$-net in terms of packing packing.  However, as well will see, there is a natural point in bounded spaces that will limit the cover.
+
+
+%------------------------------------------------------------------------------------
+\subsection{Saturation of Bounded Spaces}
+\label{subsec:saturation}
+For bounded spaces, the archive in the SNSEA will eventually \emph{saturate} the space.  That is, the space will be fully covered and packed and no more points can be admitted to the archive.  
+
+Let's start with a simple example to build intuition for this.  The  SNSEA in Hamming space will add new points to the archive until there are no points left in $\{0,1\}^n$ that can be added that will meet the sparseness criterion.  It's easy to see this for a small example, where $n=3$ and $\rho_{min} = 2$:  start with the $000$, then adding the $111$ point, now all other points are at most Hamming distance 2 from one of these two points, so no new points can be added.  This is true for all Hamming spaces for $k>1$:  eventually there will be an archive that fully covers the space with $\epsilon \sim \rho_{min}$.
+
+Actually, it is generally true for the SNSEA on any bounded metric space will converge.
+\begin{theorem}
+The SNSEA operating in a bounded space will converge in the sense that improvements in \emph{cover} will eventually stop or asymptote toward a fixed value.
+\end{theorem}
+\textbf{Proof:} We start with the observation that an archive, $A$, can be seen as a set of centroids that define a Vornoi tessellation \cite{??} over a bounded space, $U$.  The maximum distance between the centers of two Vornoi regions is not more than the sum of the maximum distance of points in the first region to its centroid and the maximum distance of points in the adjacent region to its centroid \cite{??}.  
+
+Let's consider the situation where we are adding an external point $\hat{x}$ to an archive that forms an $\epsilon$-cover and \emph{at most} an $\epsilon$-packing.  That is, the maximum distance between any pair of points in the archive is at most $2\epsilon$ and the maximum distance between any point in the space and it's closest archive point is at most $\epsilon$.  Then the worst case situation is when the Vornoi regions are stacked in such a way that the second closest archive point is directly behind the first, and so on.  So the distance between $\hat{x}$ and the closest archive point is (meh:) at most $\epsilon$, the distance to the next closest point is at most $\epsilon + 2\epsilon$, etc.
+
+\begin{figure}[t]
+  \rule{0.9\textwidth}{3cm}
+  \caption{\label{fig:vornoi} Worst case archive layout for adding point $\hat{x}$ to the archive forming a Vornoi region.}
+\end{figure}
+
+Thus, the sparseness of this point with respect to the $A^\prime_{\hat{x}} \subset A$ closest archive points is:
+\begin{eqnarray*}
+  \rho_{\hat{x}} & = & \frac{1}{k} \sum_{a \in A^\prime_{\hat{x}}} \delta(\hat{x},a) \\
+                 & \leq & \frac{1}{k} \cdot\left( \epsilon + \sum_{j=1}^{k-1} \left( \epsilon + 2j\epsilon \right) \right) \\
+                 & = & \frac{\epsilon + \epsilon\left(k^2 +1\right)}{k} \\
+                 & = & k\epsilon
+\end{eqnarray*}
+
+There are only situations to consider.  The first case is when the cover of the algorithm during run time reaches a point small enough that $k\epsilon < \rho_{min}$.  In which case, no new points in $U$ can be added to the archive and the cover measure will no longer improve (decrease).  In the second case, the cover never gets small enough for this to occur, which by definition implies that the algorithm is converging on a limit point for $\epsilon$.  In either event, the SNSEA in bounded spaces converges.$\blacksquare$
+
+\vspace*{1ex}
+
+As straightforward as this is, it is also instructive.  In a perhaps unsatisfying way, this is sufficient to dismiss the claim that novelty search \emph{always} diverges.  Simple novelty search in bounded spaces \emph{must} converge in the sense that the archive will saturate and no new points can be added.  We will discuss informally why this kind of stalling can still happen in unbounded spaces, below.
+
+
+%------------------------------------------------------------------------------------
+\subsection{Mutation \& Minimum Sparseness}
+\label{subsec:mutation}
+One important observation to make about the SNSEA is that it is clear that the minimum sparseness criterion and the magnitude of the mutation are deeply related.  We start with some intuition.
+
+Consider the first SNSEA step in a Hamming space of dimensionality $n$ and a bit-flip mutation rate of $1/n$.  If $\rho_{min}$ is established as a function that gows quickly with $n$ (say $\sqrt{n}$), then we will expect to wait many steps just to see a point far enough away to add to the archive.  As the archive expands, the problem gets worse because we must select a random archive point near the surface of the archive \emph{and} generate a sufficiently far away point.  In the Euclidean space, this problem is magnified since the relative ratio of the volume of the interior to the convex hull of the archive increases quickly as the archive grows.  The curse of dimensionality leads to further complications with highly dimensional spaces.
+
+On the other hand, if $\rho_{min}$ is established by a function that grows very little (say it is constant) relative to the dimensionality of the space, then the SNSEA will spread out very slowly in the space\,---\,indeed, exponentially slowly as $n$ increases for Hamming space.  
+
+Below we formalize this idea below for Hamming spaces with two proofs.  In the first case, we examine the waiting time until a new point can be admitted into the archive and bound the \emph{expected admission time}, $E[A]$, when $\rho_{min}$ is too large.  
+
+\begin{theorem}
+The expected admission time into the archive for the SNSEA with mutation rate $1/n$ operating in a Hamming space where $\rho_{min} = \sqrt{n}$ is $E[A] = \Omega(n^{\sqrt{n}})$.
+\end{theorem}
+\textbf{Proof:} First, we consider the situation at the start of the run where only $0^n$ exists in the archive.  To add a new point, the algorithm must mutate in such a way that the new point is at least $\rho_{min} = \sqrt{n}$ away in Hamming space.  This is essentially equivalent to the existing analysis of the \textsc{Jump}$_m$ function from \cite{Droste1998tr}, where we are waiting for a generation in which there are at least $m$ simultaneous bit flips, which takes expected time $\Theta(n^m)$.  In this case, $m = \sqrt{n}$, so the expected time to admit the second individual is $\Theta(n^{\sqrt{n}})$.  This is sufficient to prove the theorem. $\blacksquare$
+
+\vspace*{1ex}
+
+However, we also consider the opposite extreme when the archive $\epsilon$-covers the space and $\epsilon$ is at least some constant fraction of $\rho_{min}$, $\Omega(\rho_{min})$.  In such a case, the closest archive point to any point in the space is still $\Omega(\rho_{min})$, and again the expected waiting time to admit a new point is at least $\Omega(n^{\sqrt{n}})$.  In general, since we know the algorithm will tend to add points at distances on average at least $\sqrt{n}$ away from their $k$ closest archive points, we can expect most waiting times to admit points to be exponential.
+
+%% RPW:  Middle cases?  one really close point in the archive, but longer ones, etc.
+
+
+In the second case, we examine the waiting time for a specific Hamming level to be saturated, the \emph{expected level saturation time}, $E[L]$, when $\rho_{min}$ is too small.
+
+\begin{theorem}
+The expected time for the SNSEA to saturate the $n/2$ Hamming level with $k>2$ and mutation rate $1/n$ operating in a Hamming space where $\rho_{min} = O(c)$ is $E[L] = 2^{\Omega(n)}$ steps.
+\end{theorem}
+\textbf{Proof:} The $n/2$ Hamming level contains all the binary strings with precisely $n/2$ bits.  There are $2^{n/2}$ such strings.  To pack the level, our archive will need $2^\frac{n}{2c}$ points.  We make the optimistic assumption that on every step the SNSEA flips precisely $c$ bits to produce a child that will definitely be $c$ distant from all neighbors and that our process is able to pack that space perfectly uniformly.  Since the SNSEA can only add one point to the archive in a given step, it will take $2^{\Omega(n)}$ steps to do that. Any relaxation of those assumptions will force the algorithm to take longer. $\blacksquare$
+
+\vspace*{1ex}
+
+Despite their narrow circumstances, these proofs emphasize the importance of balancing the mutation rate and the sparseness criterion.  For Hamming spaces, we suggest setting the mutation rate to $1/n$ and the sparseness criterion to $c\lg n$, where $c\in (0,1)$.  We do not have a recommendation yet for Euclidean spaces, though it is clear that this tradeoff exists there, as well.  In that case, there is a strong relationship between $\sigma$ and $\rho_{min}$.
+
+
+%------------------------------------------------------------------------------------
+\subsection{SNSEA Converges in Hamming Space}
+\label{subsec:hamming}
+
+Empirically, it is easy to construct an example illustrating of saturation.  We consider $n=16$, $\rho_{min} = \frac{3}{4} \lg 16 = 3$, and a max generation of 200.  We ran 50 independent trials and reported the mean values for our packing and cover approximations for each generation.  For comparison purposes, we also compute the average minimum sparseness for the archive in each generation\,---\,that is, we find the minimum sparseness of the archive at each step for each independent trial, and report the average over all trials.  This gives us a sense for how the internal SNSEA mechanics will relate to the packing and cover measure.  This in turn provides insight into the convergence properties of the SNSEA.
+%
+\begin{figure}[t]
+\includegraphics[width=0.48\textwidth]{Figures/hamming-r3-n16.pdf}
+%\rule{0.4\textwidth}{0.3\textwidth}
+\caption{\label{fig:hamming} SNSEA applied to a Hamming space with $n=16$ and $\rho_{min} = 3$ averaged over 50 independent trials.}
+\end{figure}
+%
+We can see from Figure~\ref{fig:hamming} that, indeed, the cover of the Hamming space decreases steadily and the packing increases steadily.  This experiment clearly shows SNSEA converging to an $\epsilon$-net.  The internal sparseness measure also levels off with the other two curves.  Now let's see what this looks like over different values of $k$ ($k\in\{3,5,7\}$) and $n$ ($n\in\{16, 32, 64\}$).
+%
+\begin{figure}[t]
+%\includegraphics[width=0.48\textwidth]{Figures/hamming-r3-n16.pdf}
+\rule{0.8\textwidth}{1.5\textwidth}
+\caption{\label{fig:hamming-general} SNSEA applied to a Hamming space with $k\in\{3,5,7\}$) and $n$ ($n\in\{16, 32, 64\}$ averaged over 50 independent trials.}
+\end{figure}
+%
+
+While from the perspective of individual points in the space, one might be led to believe anecdotally that the process is divergent (the archive grows steadily until the space is filled), empirically we can see that the search is occurring at the level of the \emph{archive} space, not the individual point space.  In that sense, the process is clearly convergent\,---\,the SNSEA's archive converges in terms of \emph{cover}.
+
+
+
+%%%% RPW:  Still working on the text below VVVVV
+
+%------------------------------------------------------------------------------------
+\subsection{SNSEA Converges in Bounded Euclidean Space}
+\label{subsec:bounded}
+Again, it is easy to construct an example illustrating that bounded Euclidean spaces can converge.  We consider $d=3$, $\rho_{min} = 0.6$, $\sigma=0.3$, and a max generation of 500.  We ran 50 independent trials and again reported the mean values for our packing, cover, and min sparseness approximations for each generation.  
+ %
+\begin{figure}[t]
+\includegraphics[width=0.48\textwidth]{Figures/bounded-r-06-s-03.pdf}
+\caption{\label{fig:bounded} SNSEA applied to a bounded 3-dimensional Euclidean space averaged over 50 independent trials.}
+\end{figure}
+%
+Figure~\ref{fig:bounded} clearly shows an example where the SNSEA on a bounded 3D Euclidean space converges to an $\epsilon$-net.  Note that after the net is formed, the algorithm continues to occasionally add new points.  These points are not substantively improving any measure, including and importantly the internal sparseness measure.  A local optimum has been identified by the algorithm, it has converged into that local optimum, and now it is making small fine-tuning changes to move closer to true locally optimal archive configuration.  The archive is not improving the overall cover of the space by very much.
+
+We considered a wide range of parameterizations of the algorithm, and in all cases the cover can be observed to level off eventually.  To quantify this, we used the following procedure:  For each trial of a given parametrization, we find generation in which the minimum cover value was discovered during the run.  If this generation was less than 400 out of the 500 generations the algorithm was run, then we considered the algorithm run to have ``converged''.  Below is a heat map showing  ....
+%$k\in{3,5,7}$
+%$d\in\{2,3,5\}$
+%$\sigma\in{0.2}$ and $\rho_{min} \in {0.6}$
+
+
+%%% Paul:  Fix d and k, range sigma and rho since those are what are interesting.  Maybe:  both in .2, .4, .6, .7 ?
+
+
+This is useful to know!  We can implement approximations of cover and packing in our algorithm, and when we see that an $\epsilon$-net is formed either stop the search or reset the archive to enable the search to explore new archive configurations.  
+
+
+
+
+
+
+%------------------------------------------------------------------------------------
+\subsection{SNSEA Can Converge in Unbounded Spaces}
+\label{subsec:unbounded}
+
+It should be noted that the original authors of novelty search were clear that bounded spaces are not where novelty search is intended to be run \cite{LehmanStanley2008ssls}.  Perhaps it is obvious that any bounded space will eventually be saturated by the archive?  What the above examples do, though, is illustrate that if your understanding is that novelty search is \emph{diverging} until it runs into the ``walls'' of the bounded space, then you may be looking at the process incorrectly:  The processes are \emph{converging} right from the beginning of the optimization, and the resulting archive is implicitly a local optimum (an $\epsilon$-net).
+
+But the SNSEA is driven to optimize the dual objectives of cover and packing whether spaces are bounded or unbounded.  It is true that some parameterizations will lead to an apparent continual increase in the packing; however, this is precisely the same as a traditional real-valued EA maximizing a function like $f(x)=2x -3$; the EA will continue to produce new $x$ values that give larger $f(x)$.  Whether one calls this ``convergence'' or ``divergence'' depends on one's point of view; however, the SNSEA process \emph{is} optimizing against the packing/cover objectives, regardless.
+
+However, we can eschew the semantic debate in specific cases:  There are parameterizations where the algorithm will converge in every sense of the word, even when the space is unbounded.  When the mutation $\sigma$ is small relative to the $\rho_{min}$, we can deliberately exacerbate the problem that occurs where large archive sizes make the algorithm increasingly unlikely to select points close enough to the surface of the archive that mutation has a reasonable probability to generate a point that will meet the sparseness criterion.
+
+Figure~\ref{fig:unbounded} illustrates such an example, where $\sigma=0.1$, $\rho_{min}= 0.45$, $d=8$, and the algorithm is run to 500 generations.  The space is completely unbounded.  While packing can still be estimated as it was above, cover cannot be since the space is infinitely large.  To address this, we assume that the search will (with high probability) remain within the bound $\pm\sigma\cdot maxGen$ in all dimensions, and we estimate cover as above but inside that region.  We also confirmed that though any 8D point was \emph{possible} in principle, in all runs none were generated outside that region.  Again, 50 independent trials were performed.
+%
+\begin{figure}[t]
+\includegraphics[width=0.48\textwidth]{Figures/unbounded-r-01-s-045.pdf}
+\caption{\label{fig:unbounded} SNSEA applied to an unbounded 8-dimensional Euclidean space averaged over 50 independent trials.}
+\end{figure}
+%
+This process asymptotes toward an $\epsilon$-net very, very slowly.  We keep the max generation count low so that the visualization above conveys useful information.  There is no doubt that this process is a convergent one, even though the space is unbounded.
+
+
+%====================================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+Novelty search is a powerful tool for finding complex objects in complicated, open-ended spaces.  It relies on at least three key pieces:  a sparseness metric and archive, generative representations, and distance measures in the actual solution space (e.g., behaviors) rather than genotype space.  Unfortunately, there is very little foundational analysis of how novelty search works.  This is important because there are several claims about novelty search that can and should be analyzed, perhaps first and foremost the idea that the search is ``divergent'' and ``objectiveless''.  
+
+In this paper, we consider only the first piece, using an extremely simplified version of novelty search so that we can focus entirely on how the sparseness metric and the archive update criterion affect search.  We find that, once one sees that search in novelty search happens at the level of the archive space, not the individual point space, it is clear that the sparseness measure and archive update criterion create a process that is driven by a pair of objectives:  spread out to \emph{cover} the space, while trying to remain as efficiently \emph{packed} as possible.  Our SNSEA is driven to converge to an $\epsilon$-net in the sense defined by $k$-NN theory\,---\,we claim that most novelty searches do something like this.
+
+One obvious concern about our work is the lack of a true population for the SNSEA: we rely on only the archive itself.  This concern is understandable given that the very issue we describe in the unbounded case (the process must find a point on the surface of the archive, then mutate sufficiently far away) appears related to this choice.  In a traditional novelty search with a population that has a fixed size, the population may reflect the leading edge of the search (this has yet to be analyzed).  We defend our choice in three ways.
+
+First, this is the first step in beginning to try to understand the mechanics of novelty search in a more careful and formal way.  It's best to do this with the simplest variants first.  Second, the observation that the sparseness and archive update mechanisms within novelty search are creating a process that is driven to optimize the cover and packing of a space is independent of this choice:  novelty search does this, whether or not there is a population.  Third, it isn't clear that the parent selection, new point generation problem is entirely fixed by a population.  If novelty search is indeed optimizing, it is possible that the population (as a set) may have similar problems.  At the very least, the present research suggests that it is worthwhile studying that question.
+
+This article provides three key contributions to novelty search.  First, it lays out a  vision for novelty search as an optimizer of \emph{archive} space and introduces tools from $k$-NN theory to help understand this process.  Second, it establishes guidance for configuring the mutation and the $\rho_{min}$, which are intimately tied in novelty search.  Finally, it provides constructive advice for monitoring archive performance and dealing with scenarios where novelty search appears to have converged (e.g., reset the archive).  
+
+Our next step will be to empirically explore these questions about sparseness and archives with population-based novelty search methods, preliminary results for which also appear to show convergence properties.  
+%We are also working on theoretical proofs for many of the observations made in this paper.  
+The overall goal is to develop tools and improved understandings for how novelty search works, and how engineers can make productive design choices when employing this algorithm.  Finally, we are also interested in exploring when novelty search can get stuck in local suboptima.
+
+\small
+
+\bibliographystyle{apalike}
+\bibliography{ref}
+
+
+\end{document}
