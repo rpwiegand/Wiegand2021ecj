@@ -125,11 +125,11 @@ We start with a minimalist understanding of novelty search that has only three m
   \caption{Simple Novelty Search Evolutionary Algorithm (SNSEA)}
 \end{algorithm}
 
-For this article, we consider $k\in\{3,5,7\}$ for the sparseness computation.  The termination criterion is simply a maximum number of generations (500 in many cases).  We will demonstrate the algorithm in several spaces: a discrete binary space, a bounded real valued space, and an unbounded real valued space.  
+For this article, we consider $k=3$ for the sparseness computation.  The termination criterion is simply a maximum number of generations (500 in many cases).  We will demonstrate the algorithm in several spaces: a discrete binary space, a bounded real valued space, and an unbounded real valued space.  
 
-In the case of the discrete space experiments, the SNSEA will use a binary representation where individual points exist in the space $\{0,1\}^n$, where $n$ is the length of the binary string.  Mutation is performed by independently flipping each bit with probability $1/n$.  Since there is no external problem-oriented objective, without loss of generality we initialize the first point at $0^n$.  Distance is computed in this space using Hamming distance, thus we refer to it as a \emph{Hamming Space}.  For experiments in this paper, we consider $n\in\{16, 32, 64\}$.
+In the case of the discrete space experiments, the SNSEA will use a binary representation where individual points exist in the space $\{0,1\}^n$, where $n$ is the length of the binary string.  Mutation is performed by independently flipping each bit with probability $1/n$.  Since there is no external problem-oriented objective, without loss of generality we initialize the first point at $0^n$.  Distance is computed in this space using Hamming distance, thus we refer to it as a \emph{Hamming Space}.  For experiments in this paper, we consider $n\in\{6,8,10,12,14\}$.
 
-In the case of the Euclidean space experiments, the SNSEA will use a real valued representation where the individual points exist in the space $\IR^d$, where $d$ is the dimension of the space.  Mutation is performed by independently adding an offset to every value in the vector according to $N(0,\sigma)$ (fixed $\sigma$ Gaussian mutation).  Again, without loss of generality we initialize the first point at $0^d$.  Distance is computed in this space using the $L_2$ norm Euclidean distance, thus we refer to it as a \emph{Euclidean Space}.  In the experiment where the space is bounded, we restrict mutation so that it cannot produce child gene values outside of $[0,1]$.  In those experiments, this rule is enforced by redrawing the mutation offset until the mutated gene is inside this region.  For these experiements, we consider $d\in\{2, 3, 5\}$
+In the case of the Euclidean space experiments, the SNSEA will use a real valued representation where the individual points exist in the space $\IR^d$, where $d$ is the dimension of the space.  Mutation is performed by independently adding an offset to every value in the vector according to $N(0,\sigma)$ (fixed $\sigma$ Gaussian mutation).  Again, without loss of generality we initialize the first point at $0^d$.  Distance is computed in this space using the $L_2$ norm Euclidean distance, thus we refer to it as a \emph{Euclidean Space}.  In the experiment where the space is bounded, we restrict mutation so that it cannot produce child gene values outside of $[0,1]$.  In those experiments, this rule is enforced by redrawing the mutation offset until the mutated gene is inside this region.  For these experiments, we consider $d=5$
 
 It is worth noting that conflating the population and the archive is a substantive change to the way novelty search typically works.  Another difference is that all our distance calculations are in the genotype space; however, this is not an important departure since we are only evaluating the claim about whether an objective exists, not what it looks like for a given problem instance.  That is:  If an objective exists in a genotype space and/or if there is a way to characterize \emph{some} novelty searches as ``converging'' then the \emph{general} claims that novelty search \emph{must} diverge and \emph{doesn't} have an objective are false.  Note again that we are not arguing that novelty search \emph{cannot} diverge in some cases, nor that novelty search is ineffective.  We are just trying to understand the nature of archives, updates, and the type of space novelty search EAs traverse.  For this, a genotypic representation is sufficient.
 
@@ -177,11 +177,11 @@ One argument for why novelty search \emph{should} and typically \emph{does} sepa
 %
 This algorithm represents a slight generalization of the one presented in \cite{Wiegand2021flairs}.
 
-Again, we consider $k\in{3,5,7}$ for the sparseness computation.  The termination criterion is simple a maximum number of generations.  We will consider a real-valued representations, where again $d\in\{2,3,5\}$ dimensions.  Gene values are unbounded, and mutation works by independently adding a value drawn from ${\cal N}(0,\sigma)$.  This allows the possibility for the archive to grow in an unbounded way by adding individuals that are ``novel'' in the sense that they are quite distant from individuals seen before.  Again, distance is computed using the $L_2$ norm, Euclidean distance.
+Again, we consider $k=3$ for the sparseness computation.  The termination criterion is simple a maximum number of generations.  We will consider a real-valued representations, where again $d=5$ dimensions.  Gene values are unbounded, and mutation works by independently adding a value drawn from ${\cal N}(0,\sigma)$.  This allows the possibility for the archive to grow in an unbounded way by adding individuals that are ``novel'' in the sense that they are quite distant from individuals seen before.  Again, distance is computed using the $L_2$ norm, Euclidean distance.
 
 For reasons that will become clear when we discuss the results of the SNSEA studies, we do not consider bounded spaces for the PSNSEA.  As before, distance calculations are in the genotype space.
 
-In all cases, experiments were replicated for 50 independent trials and run to 500 generations. All experiments in this paper use $\sigma\in{0.1,0.2}$ and $\rho_{min} \in {0.45, 0.65}$.  We consider both cases where population selection is based on individuals' sparseness with respect to the child population and with respect to the archive.
+In all cases, experiments were replicated for 50 independent trials and run to 500 generations. All experiments in this paper use $\sigma\in{0.1,0.2,0.3}$ and $\rho_{min} \in {0.2,0.4,0.6}$.  We consider both cases where population selection is based on individuals' sparseness with respect to the child population and with respect to the archive.
 
 
 %------------------------------------------------------------------------------------
@@ -275,7 +275,7 @@ As straightforward as this is, it is also instructive.  In a perhaps unsatisfyin
 \label{subsec:mutation}
 One important observation to make about the SNSEA is that it is clear that the minimum sparseness criterion and the magnitude of the mutation are deeply related.  We start with some intuition.
 
-Consider the first SNSEA step in a Hamming space of dimensionality $n$ and a bit-flip mutation rate of $1/n$.  If $\rho_{min}$ is established as a function that gows quickly with $n$ (say $\sqrt{n}$), then we will expect to wait many steps just to see a point far enough away to add to the archive.  As the archive expands, the problem gets worse because we must select a random archive point near the surface of the archive \emph{and} generate a sufficiently far away point.  In the Euclidean space, this problem is magnified since the relative ratio of the volume of the interior to the convex hull of the archive increases quickly as the archive grows.  The curse of dimensionality leads to further complications with highly dimensional spaces.
+Consider the first SNSEA step in a Hamming space of dimensionality $n$ and a bit-flip mutation rate of $1/n$.  If $\rho_{min}$ is established as a function that grows quickly with $n$ (say $\sqrt{n}$), then we will expect to wait many steps just to see a point far enough away to add to the archive.  As the archive expands, the problem gets worse because we must select a random archive point near the surface of the archive \emph{and} generate a sufficiently far away point.  In the Euclidean space, this problem is magnified since the relative ratio of the volume of the interior to the convex hull of the archive increases quickly as the archive grows.  The curse of dimensionality leads to further complications with highly dimensional spaces.
 
 On the other hand, if $\rho_{min}$ is established by a function that grows very little (say it is constant) relative to the dimensionality of the space, then the SNSEA will spread out very slowly in the space\,---\,indeed, exponentially slowly as $n$ increases for Hamming space.  
 
@@ -309,55 +309,71 @@ Despite their narrow circumstances, these proofs emphasize the importance of bal
 \subsection{SNSEA Converges in Hamming Space}
 \label{subsec:hamming}
 
-Empirically, it is easy to construct an example illustrating of saturation.  We consider $n=16$, $\rho_{min} = \frac{3}{4} \lg 16 = 3$, and a max generation of 200.  We ran 50 independent trials and reported the mean values for our packing and cover approximations for each generation.  For comparison purposes, we also compute the average minimum sparseness for the archive in each generation\,---\,that is, we find the minimum sparseness of the archive at each step for each independent trial, and report the average over all trials.  This gives us a sense for how the internal SNSEA mechanics will relate to the packing and cover measure.  This in turn provides insight into the convergence properties of the SNSEA.
+Empirically, it is easy to construct an example illustrating of saturation.  We consider $n=10$, $\rho_{min} = \frac{3}{4} \lg 10 = 2.491$, and a max generation of 200.  We ran 50 independent trials and reported the mean values for our packing and cover approximations for each generation.  For comparison purposes, we also compute the average minimum sparseness for the archive in each generation\,---\,that is, we find the minimum sparseness of the archive at each step for each independent trial, and report the average over all trials.  This gives us a sense for how the internal SNSEA mechanics will relate to the packing and cover measure.  This in turn provides insight into the convergence properties of the SNSEA.
 %
 \begin{figure}[t]
-\includegraphics[width=0.48\textwidth]{Figures/hamming-r3-n16.pdf}
-%\rule{0.4\textwidth}{0.3\textwidth}
-\caption{\label{fig:hamming} SNSEA applied to a Hamming space with $n=16$ and $\rho_{min} = 3$ averaged over 50 independent trials.}
+\includegraphics[width=1\textwidth]{Figures/hamming-500-n10-NOPOP.pdf}
+\caption{\label{fig:hamming:nopop:n10} SNSEA applied to a Hamming space with $n=10$ and $\rho_{min} = 2.491$ averaged over 50 independent trials.}
 \end{figure}
 %
-We can see from Figure~\ref{fig:hamming} that, indeed, the cover of the Hamming space decreases steadily and the packing increases steadily.  This experiment clearly shows SNSEA converging to an $\epsilon$-net.  The internal sparseness measure also levels off with the other two curves.  Now let's see what this looks like over different values of $k$ ($k\in\{3,5,7\}$) and $n$ ($n\in\{16, 32, 64\}$).
+We can see from Figure~\ref{fig:hamming:nopop:n10} that, indeed, the cover of the Hamming space decreases steadily and the packing increases steadily.  This experiment clearly shows SNSEA converging to an $\epsilon$-net.  The internal sparseness measure also levels off with the other two curves.  These results are independent but consistent with \cite{Wiegand2019flairs}.  
+
+Now let's see what cover convergence looks like over different values of $n$ ($n\in\{6, 8, 10, 12, 14\}$).  Figure~\ref{fig:hamming:nopop:sm} below shows that in all cases, the algorithm appears to converge in terms of the cover epsilon measure.
 %
 \begin{figure}[t]
-%\includegraphics[width=0.48\textwidth]{Figures/hamming-r3-n16.pdf}
-\rule{0.8\textwidth}{1.5\textwidth}
-\caption{\label{fig:hamming-general} SNSEA applied to a Hamming space with $k\in\{3,5,7\}$) and $n$ ($n\in\{16, 32, 64\}$ averaged over 50 independent trials.}
+\includegraphics[width=1\textwidth]{Figures/hamming-500sm-NOPOP.pdf}
+\caption{\label{fig:hamming:nopop:sm} Cover values for SNSEA applied to a Hamming space with $n$ ($n\in\{6, 8, 10, 12, 14\}$ averaged over 50 independent trials.}
 \end{figure}
 %
 
-While from the perspective of individual points in the space, one might be led to believe anecdotally that the process is divergent (the archive grows steadily until the space is filled), empirically we can see that the search is occurring at the level of the \emph{archive} space, not the individual point space.  In that sense, the process is clearly convergent\,---\,the SNSEA's archive converges in terms of \emph{cover}.
+To determine whether these algorithms are indeed converging, we conducted the following experiment.  For each trial, we ket track of the lowest cover value found and insisted that the algorithm must conduct at least 50 generations, and further that it must continue for at least as many generations as it took to first uncover that value without finding a lower value.  In other words, if it took 121 generations to find the lowest cover, then we continued the algorithm until \emph{at least} generation 242 unless a new cover value was found.  Moreover, we \emph{also} required that no additional points were added to the archive during the last half of the trial.
 
+Our maximum number of generations was set to 5,000.  Anytime the cover value found in a trial was discovered after to generation 2,500 \emph{or} any point was added to the archive after that point, we considered that trial to have \textsc{Not Converged}, otherwise the algorithm clearly \textsc{Converged} since \emph{doubling} the generation count to find a lower value did not help.  
 
+In all trials of all values of $n$  for the Hamming space experiments, the SNSEA converged in the sense we just described.
 
-%%%% RPW:  Still working on the text below VVVVV
+While from the perspective of individual points in the space, one might be led to believe anecdotally that the process is divergent (the archive grows steadily until the space is filled), empirically we can see that the search is occurring at the level of the \emph{archive} space, not the individual point space.  In that sense, the process is clearly convergent\,---\,the SNSEA's archive converges in terms of \emph{cover} in Hamming space.
+
 
 %------------------------------------------------------------------------------------
 \subsection{SNSEA Converges in Bounded Euclidean Space}
 \label{subsec:bounded}
-Again, it is easy to construct an example illustrating that bounded Euclidean spaces can converge.  We consider $d=3$, $\rho_{min} = 0.6$, $\sigma=0.3$, and a max generation of 500.  We ran 50 independent trials and again reported the mean values for our packing, cover, and min sparseness approximations for each generation.  
+Again, it is easy to construct an example illustrating that bounded Euclidean spaces can converge.  We consider $d=5$, $\rho_{min} = 0.2$, $\sigma=0.1$, and a max generation of 500.  We ran 50 independent trials and again reported the mean values for our packing, cover, and min sparseness approximations for each generation.  
  %
 \begin{figure}[t]
-\includegraphics[width=0.48\textwidth]{Figures/bounded-r-06-s-03.pdf}
-\caption{\label{fig:bounded} SNSEA applied to a bounded 3-dimensional Euclidean space averaged over 50 independent trials.}
+\includegraphics[width=1\textwidth]{Figures/bounded-s01-r03-NOPOP.pdf}
+\caption{\label{fig:bounded:nopop:0103} SNSEA applied to a bounded 5-dimensional Euclidean space averaged over 50 independent trials.}
 \end{figure}
 %
-Figure~\ref{fig:bounded} clearly shows an example where the SNSEA on a bounded 3D Euclidean space converges to an $\epsilon$-net.  Note that after the net is formed, the algorithm continues to occasionally add new points.  These points are not substantively improving any measure, including and importantly the internal sparseness measure.  A local optimum has been identified by the algorithm, it has converged into that local optimum, and now it is making small fine-tuning changes to move closer to true locally optimal archive configuration.  The archive is not improving the overall cover of the space by very much.
+Figure~\ref{fig:bounded:nopop:0103} clearly shows an example in which the SNSEA on a bounded 5D Euclidean space converges \emph{both} in terms of cover and packing.  Indeed, the algorithm appears to have found an archive that approximates an $\epsilon$-net over the bounded space.  
 
-We considered a wide range of parameterizations of the algorithm, and in all cases the cover can be observed to level off eventually.  To quantify this, we used the following procedure:  For each trial of a given parametrization, we find generation in which the minimum cover value was discovered during the run.  If this generation was less than 400 out of the 500 generations the algorithm was run, then we considered the algorithm run to have ``converged''.  Below is a heat map showing  ....
-%$k\in{3,5,7}$
-%$d\in\{2,3,5\}$
-%$\sigma\in{0.2}$ and $\rho_{min} \in {0.6}$
+Now let's see what cover convergence looks like over different values of $\sigma$ and $\rho_{min}$.  Figure~\ref{fig:hamming:nopop:sm} below shows that in all but one case, the algorithm appears to converge in terms of the cover epsilon measure.  When $\sigma=0.1$ and $\rho_{min} = 0.6$ the algorithm never improves at all.  This is because the radius of likely changes due to mutation is too small to generate sufficiently different individuals to meet the minimum sparseness conditions.  When the ratio between $\sigma$ and $\rho_{min}$ is around 1:3 or 1:4, the algorithm appears to perform the best in terms of making steady progress in cover.  This highlights the fact that there is an important balance to be reached between mutation and the sparseness criterion.
+%
+\begin{figure}[t]
+\includegraphics[width=0.8\textwidth]{Figures/bounded-500sm-NOPOP.pdf}
+\caption{\label{fig:bounded:nopop:sm} Cover values for SNSEA applied to a Hamming space with $\sigma\in\{0.1  0.2m 0.3\}$ and $\rho_{min} \in \{0.2, 0.4, 0.6\}$ averaged over 50 independent trials.}
+\end{figure}
+%
+
+We considered a wide range of parameterizations of the algorithm, and in all cases the cover can be observed to level off eventually (or fail to start).  To quantify this, we used the procedure described above:  each trial was allowed to continue until it took at least as long after finding the smallest cover value or adding a new point to the archive.  If the algorithm accomplished these both before 2,500 generations, we considered it to have \textsc{Converged}.  Figure~\ref{fig:bounded:nopop:conv} below shows that in almost all cases, these conditions were met.  Even if the handful of cases where it did not meet, there were always more than 1,500 generations of stagnation before we gave up at generation 5,000.  
+%
+\begin{figure}[t]
+\includegraphics[width=0.8\textwidth]{Figures/bounded-conv-NOPOP.pdf}
+\caption{\label{fig:bounded:nopop:conv} Convergence percentages over 50 trials for the SNSEA operating over different $\sigma$ and $\rho_{min}$ values.}
+\end{figure}
+%
 
 
-%%% Paul:  Fix d and k, range sigma and rho since those are what are interesting.  Maybe:  both in .2, .4, .6, .7 ?
+%%RPW:  ?? Note that after the net is formed, the algorithm continues to occasionally add new points.  These points are not substantively improving any measure, including and importantly the internal sparseness measure.  A local optimum has been identified by the algorithm, it has converged into that local optimum, and now it is making small fine-tuning changes to move closer to true locally optimal archive configuration.  The archive is not improving the overall cover of the space by very much.
 
 
-This is useful to know!  We can implement approximations of cover and packing in our algorithm, and when we see that an $\epsilon$-net is formed either stop the search or reset the archive to enable the search to explore new archive configurations.  
+Knowing that the SNSEA converges in bounded spaces is useful! We can implement approximations of cover and packing in our algorithm, and when we see that an $\epsilon$-net is formed either stop the search or reset the archive to enable the search to explore new archive configurations.  
 
 
 
 
+
+%%%% RPW:  Still working on the text below VVVVV
 
 
 %------------------------------------------------------------------------------------
