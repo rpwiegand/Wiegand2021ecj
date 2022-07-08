@@ -1,0 +1,110 @@
+%%%
+%%%
+%%%
+%%% The SEANMACROS Macro file
+%%%
+%%% Chock full of goodies that you might find useful!
+%%%
+%%% I am putting together a collection of macros that I use all the time here.
+%%% More will show up later.
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{seanmacros}[2002/12/30]
+
+%%% Some packages we need to use
+\RequirePackage{color}
+\RequirePackage{ifthen}
+\RequirePackage{epsfig}
+
+%%% option declarations
+\newboolean{showchanges}
+\setboolean{showchanges}{false}
+\DeclareOption{showchanges}{\setboolean{showchanges}{true}}
+\ProcessOptions
+
+%%% \ignore{TEXT}
+%%% Comments out the text.
+\newcommand\ignore[1]{}
+
+%%%  \usepackage[showchanges]{seanmacros} 
+%%%	Turns on use of showchanges facility
+%%%  \ch{oldtext}{newtext}
+%%%	If showchanges facility is on, then oldtext is displayed in red, and newtext in blue.
+%%%	If showchanges facility is off, then only newtext is displayed (and not in color)
+%%%	The idea here is that you can display changes by showing the text that was
+%%%	changed in red, and the text you changed it to in blue
+%%%  \chl{explanation}{oldtext}{newtext}
+%%%	Exactly like \ch{oldtext}{newtext}, but also adds an explanation (in blue)
+%%%	as a margin paragraph.  If showchanges facility is turned off, then the margin
+%%%	paragraph does not appear.
+%%% \com{comment}
+%%%	Adds a comment
+
+%\setlength\marginparwidth{90pt}
+\newcommand{\ch}[2]{
+	\ifthenelse{\boolean{showchanges}}
+		{{\color{red}#1}{\color{blue}#2}}
+		{#2}}
+\newcommand{\com}[1]{
+	\ifthenelse{\boolean{showchanges}}
+		{\marginpar{\scriptsize{\color{blue}#1}}}{}}
+\newcommand{\chl}[3]
+	{\ifthenelse{\boolean{showchanges}}
+		{\com{#1}\ch{#2}{#3}}
+		{#3}
+	}
+
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+%%% Just like \ch and \chl, but the new text and explanation are shown in green.
+\newcommand{\cha}[2]{
+	\ifthenelse{\boolean{showchanges}}
+		{{\color{red}#1}{\color{darkgreen}#2}}
+		{#2}}
+\newcommand{\coma}[1]{
+	\ifthenelse{\boolean{showchanges}}
+		{\marginpar{\scriptsize{\color{darkgreen}#1}}}{}}
+\newcommand{\chla}[3]
+	{\ifthenelse{\boolean{showchanges}}
+		{\coma{#1}\cha{#2}{#3}}
+		{#3}
+	}
+	
+\definecolor{purple}{rgb}{0.5,0,0.5}
+%%% Just like \ch and \chl, but the new text and explanation are shown in purple.
+\newcommand{\chb}[2]{
+	\ifthenelse{\boolean{showchanges}}
+		{{\color{red}#1}{\color{purple}#2}}
+		{#2}}
+\newcommand{\comb}[1]{
+	\ifthenelse{\boolean{showchanges}}
+		{\marginpar{\scriptsize{\color{purple}#1}}}{}}
+\newcommand{\chlb}[3]
+	{\ifthenelse{\boolean{showchanges}}
+		{\coma{#1}\chb{#2}{#3}}
+		{#3}
+	}
+	
+%%% \puteps{file-without-extension}{width}{caption}{label}
+%%%	Makes a one-column eps figure, set with [tbhp]
+
+\newcommand{\puteps}[4]{
+	\begin{figure}[tbhp]
+	\begin{center}
+	\psfig{file={#1},width={#2}}
+	\end{center}
+	\caption{#3}
+	\label{#4}
+	\end{figure}
+	}
+
+%%% \user
+%%% Makes a tilde suitable for placing into URLs (unlike the standard tilde , which is too high)
+\newcommand{\user}{\(\sim\)}
+
+%%% \aside{text}
+%%%	Turns on display of aside -- without showchanges, the aside text is not displayed
+\newcommand{\aside}[1]{\textbf{\color{red}{[#1]}}}
+
+%%% I include this because it's almost ALWAYS the case
+\sloppy
+
